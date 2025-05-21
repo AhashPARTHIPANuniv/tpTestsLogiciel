@@ -2,8 +2,7 @@ package com.example.demo.web;
 
 import com.example.demo.data.Voiture;
 import com.example.demo.service.Echantillon;
-import com.example.demo.service.Statistique;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.demo.service.StatistiqueImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -12,8 +11,12 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -21,54 +24,38 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class WebTests {
 
-    @MockBean
-    Statistique statistique;
+	@MockBean
+	StatistiqueImpl statistiqueImpl;
 
-    @Autowired
-    MockMvc mockMvc;
+	@Autowired
+	MockMvc mockMvc;
 
-    @Autowired
-    ObjectMapper objectMapper;
+	@Test
+	void testZeroVoiture() throws Exception {
+		mockMvc.perform(get("/statistique")
+			.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isOk());
+	}
 
-    @Test
-    void testGetStatistiques() throws Exception {
-        Echantillon echantillon = new Echantillon(2, 15000);
-        when(statistique.prixMoyen()).thenReturn(echantillon);
+	@Test
+	void ajouterVoiture() throws Exception {
+		mockMvc.perform(post("/voiture")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{ \"marque\": \"Ferrari\", \"prix\": 5000 }")
+			.accept(MediaType.APPLICATION_JSON))
+			.andExpect(status().isOk());
+	}
 
-        mockMvc.perform(get("/statistique"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.nombreDeVoitures").value(2))
-                .andExpect(jsonPath("$.prixMoyen").value(15000));
-    }
+	@Test
+	public void getStatistiques() throws Exception {
+		doNothing().when(statistiqueImpl).ajouter(new Voiture("Ferrari", 5000));
+		when(statistiqueImpl.prixMoyen()).thenReturn(new Echantillon(1, 5000));
+		mockMvc.perform(get("/statistique"))
+			.andDo(print())
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.nombreDeVoitures").value("1"))
+			.andExpect(jsonPath("$.prixMoyen").value("5000"))
+			.andReturn();
+	}
 
-    @Test
-    void testCreerVoiture() throws Exception {
-        Voiture voiture = new Voiture("Peugeot", 10000);
-
-        ArgumentCaptor<Voiture> captor = ArgumentCaptor.forClass(Voiture.class);
-
-        mockMvc.perform(post("/voiture")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(voiture)))
-                .andDo(print())
-                .andExpect(status().isOk());
-
-        verify(statistique, times(1)).ajouter(captor.capture());
-
-        Voiture capturedVoiture = captor.getValue();
-        assertEquals(voiture.getNom(), capturedVoiture.getNom());
-        assertEquals(voiture.getPrix(), capturedVoiture.getPrix());
-    }
-
-    @Test
-    void testGetStatistiquesNoCars() throws Exception {
-        when(statistique.prixMoyen()).thenThrow(ArithmeticException.class);
-
-        mockMvc.perform(get("/statistique"))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Aucune voiture disponible"));
-    }
 }

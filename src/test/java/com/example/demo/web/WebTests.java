@@ -47,13 +47,19 @@ class WebTests {
     void testCreerVoiture() throws Exception {
         Voiture voiture = new Voiture("Peugeot", 10000);
 
+        ArgumentCaptor<Voiture> captor = ArgumentCaptor.forClass(Voiture.class);
+
         mockMvc.perform(post("/voiture")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(voiture)))
                 .andDo(print())
                 .andExpect(status().isOk());
 
-        verify(statistique, times(1)).ajouter(voiture);
+        verify(statistique, times(1)).ajouter(captor.capture());
+
+        Voiture capturedVoiture = captor.getValue();
+        assertEquals(voiture.getNom(), capturedVoiture.getNom());
+        assertEquals(voiture.getPrix(), capturedVoiture.getPrix());
     }
 
     @Test
